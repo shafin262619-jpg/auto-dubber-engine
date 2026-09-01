@@ -558,9 +558,10 @@ class Orchestrator:
                 self.log(f"📥 Using cached GitHub instruction for {raw_url}")
                 return cache_file.read_text(encoding="utf-8")
 
-            # URL-encode the path portion to handle spaces/special chars
+            # Safely URL-encode the path: unquote first (to handle any
+            # already-encoded chars), then re-quote (to catch raw spaces).
             parsed = urllib.parse.urlparse(raw_url)
-            safe_path = urllib.parse.quote(parsed.path, safe="/@:!$&'()*+,;=-._~")
+            safe_path = urllib.parse.quote(urllib.parse.unquote(parsed.path), safe="/")
             encoded_url = urllib.parse.urlunparse((parsed.scheme, parsed.netloc, safe_path, parsed.params, parsed.query, parsed.fragment))
 
             def _fetch() -> str:
