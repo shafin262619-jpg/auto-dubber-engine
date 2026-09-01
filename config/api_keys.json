@@ -1,0 +1,250 @@
+[
+  {
+    "key": "AIzaSyDMsdgyymE_GxXb1HTJ-BmzWUvgyQ6syHU",
+    "status": "active",
+    "usage_count": 3,
+    "last_tested": "2026-08-29T17:35:35+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AIzaSyAl40RsJl2vrV1AfX_vs50shbxIeSEbSZI",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:52+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6Lmek92XmReT4imHxLYWgKdiKrBOnvPXAclZs-LaP0JNQ",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:53+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6IwAxcC8Pb5FVnZ3g8Pbj8ZZeMxBfpkaol9I7X4Ls8yxA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:52+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6IFSzzL1DHDLe1_vHavv7XE7GALfbSR_RcOVGL8LULnwg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:52+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6KcCg5t71OzPFY47-7hsxI5AX4-4SK9dYVlfeBM7M9hnQ",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6KtEqQMDZS4xucjA828hQ1tZqgtH0TOucI2IyCvzyJkrQ",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:52+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6IsmKkfxG2wrmCPXFJIK7njg7dhqjylsbr5UPGKaa_hsA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:52+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6LJ6NrxjN1ClhK7vv1Dr3vzziT3_JRS4dQfTB2wbPLLng",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:54+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6I8PyYdwDMn2CwZ33clfsYvBHt77_xu0EMxLI3o2axbTg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:54+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6JidZw35y9YNQokB-Wn_2yI7OC-D5XaIPdkVRJL4b03FQ",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:54+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6I9EpciDFTG-X9BN6VLx-JnfmIpjWhtNkrUrXGrXMQBLA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:54+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6LN5TBP_eHueriYSO5Z4C5pJaO618T2cvskqBEFgmChdw",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6Kh6Nr4kA8VaoK3wfMkyzs0zGV-3NmtpmR5AiWZKqXNlA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:54+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6KZVPKzJ_OXcaDYiB5csQ3JZJN3vlZsOld4lHf-xWhEDQ",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:57+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6LQObNZ9mXFbSO1sSnH8ds2UVADrXVlE12ltx8-B81y9w",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6LlPCbmpnbjx3A1CU7JbrMZtQKSWo4_5f47Mkwju0ZEow",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6L2bt1Lt1_ETX6fCrT8kGePvVy9KhE9LFF4sbgbCIlfmg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:55+00:00",
+    "last_error": "",
+    "working_model": "None"
+  },
+  {
+    "key": "AQ.Ab8RN6K7iqTUXRDxWQ26IkukpRnqIFdJ9m0UH9Wgd-a6U2ijxg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6Lw-rvMnDWoRk9K1drIkjMRs9KolY2RtStwIvmYkWeX0g",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:57+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6IW4NFznKXbHvXjNeqYqK3lk5KSw_z5mT3rPCDc1aAvyw",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:56+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6IvDDF754fS3gQsthqn7O7Ge_5urGZG7nH9PJF3ud5F_Q",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:57+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6J8LmyyFhFNFfHyxA5wK1FwK4F2KaqouXaca5tCZw6Ptg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6JlImCPypi5q2Up0YEjjwbOETxE-SajSBYfL5ZrdHxTyw",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6I1nrUuIK6uZVNKNnNo11oj-ff0IfDZrtPcV3MmMNQjCg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6LNkCAAM77QwcavCZdIqfssg4rLUcEpL61ENjuoP3aLsw",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:59+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6KMxFA3L7SBhtEZtI5KRYbd6dEE7q6sKomxe85tkVjvWA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:57+00:00",
+    "last_error": "",
+    "working_model": "None"
+  },
+  {
+    "key": "AQ.Ab8RN6KpTnQP2hlBkn1v9ezOzNAyiYIMxII1_aGQeQvM-XkYHg",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6KvMQf0k6AkBrYYBYTv4evQyWFgBBg7OXmrKoLsBCZAGA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  },
+  {
+    "key": "AQ.Ab8RN6ILWdUpyY5kEm5H3rh10KMyi7wftaQjiElx8WWv6y2jBA",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:22:58+00:00",
+    "last_error": "",
+    "working_model": "None"
+  },
+  {
+    "key": "AQ.Ab8RN6K_88mtu73kuUujPCHrBkXVr1ayPUGs__TohOHdJsbL-Q",
+    "status": "active",
+    "usage_count": 0,
+    "last_tested": "2026-08-28T18:23:00+00:00",
+    "last_error": "",
+    "working_model": "gemini-3.6-flash"
+  }
+]

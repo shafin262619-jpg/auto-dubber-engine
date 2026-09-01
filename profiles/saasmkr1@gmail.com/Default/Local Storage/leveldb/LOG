@@ -1,0 +1,6 @@
+2026/08/29-03:46:34.572 cf8c Reusing MANIFEST /home/shafin/Desktop/BlueprintTube_Project/Claude-workstation/profiles/Saas1/Default/Local Storage/leveldb/MANIFEST-000001
+2026/08/29-03:46:34.608 cf8c Recovering log #3
+2026/08/29-03:46:34.612 cf8c Reusing old log /home/shafin/Desktop/BlueprintTube_Project/Claude-workstation/profiles/Saas1/Default/Local Storage/leveldb/000003.log 
+2026/08/29-03:47:34.626 cf8c Level-0 table #5: started
+2026/08/29-03:47:34.636 cf8c Level-0 table #5: 21405 bytes OK
+2026/08/29-03:47:34.643 cf8c Delete type=0 #3

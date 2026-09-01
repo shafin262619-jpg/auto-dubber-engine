@@ -1,0 +1,55 @@
+{
+  "claude_url": "https://claude.ai",
+  "headless": false,
+  "stealth": true,
+  "default_timeout_ms": 60000,
+  "poll_interval_sec": 1.0,
+  "stability_checks_required": 3,
+  "max_stop_generating_wait_sec": 600,
+  "gemini_default_model": "gemini-3.6-flash",
+  "gemini_test_model": "gemini-3.6-flash",
+  "gemini_test_models": [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash"
+  ],
+  "profiles_dir": "profiles",
+  "downloads_dir": "workspace/downloads",
+  "exports_dir": "workspace/exports",
+  "github_cache_dir": "workspace/.github_cache",
+  "account_limit_scan_interval_sec": 2.0,
+  "limit_detection_phrases": [
+    "you've reached your limit",
+    "you've hit your limit",
+    "limit reached",
+    "out of messages",
+    "too many requests",
+    "try again later",
+    "rate limited"
+  ],
+  "known_gemini_models": [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash"
+  ],
+  "github_instructions_repo": "https://raw.githubusercontent.com/your-org/your-repo/main",
+  "github_instructions_branch": "main",
+  "github_instruction_files": {
+    "translation": "Update data/video_dialogue_screenshot_hindi_translation_instructions.md",
+    "sync": "Update data/video_sync_instructions.md",
+    "subtitles": "Update data/Hindi subtitles+Effect Ad/PLAYBOOK.md"
+  },
+  "split_strategy": {
+    "max_parallel_accounts": 3,
+    "min_chunk_duration_sec": 30,
+    "initial_split_count": 2,
+    "secondary_split_count": 3
+  },
+  "video_pipeline_model": "Sonnet 5",
+  "video_pipeline_effort": "High",
+  "video_pipeline_thinking": true
+}

@@ -1,0 +1,8 @@
+2026/08/29-23:34:17.205 ba0f Reusing MANIFEST /home/shafin/Desktop/BlueprintTube_Project/Claude-workstation/profiles/A2/Default/Local Storage/leveldb/MANIFEST-000001
+2026/08/29-23:34:17.234 ba0f Recovering log #16
+2026/08/29-23:34:17.235 ba0f Level-0 table #18: started
+2026/08/29-23:34:17.245 ba0f Level-0 table #18: 20237 bytes OK
+2026/08/29-23:34:17.246 ba0f Recovering log #18
+2026/08/29-23:34:17.248 ba0f Reusing old log /home/shafin/Desktop/BlueprintTube_Project/Claude-workstation/profiles/A2/Default/Local Storage/leveldb/000018.log 
+2026/08/29-23:34:17.254 ba0f Delete type=2 #19
+2026/08/29-23:34:17.255 ba0f Delete type=0 #16
