@@ -22,6 +22,11 @@
 - Output attribution (কোন অ্যাকাউন্ট/মডেল জেনারেট করেছে তা আউটপুটে লেখা থাকে)
 - ফাইল ইন্টারসেপশন (Claude-র আর্টিফ্যাক্ট ডাউনলোড)
 - Light/Dark থিম (Claude-এর warm palette)
+- **🎬 9-Step Auto-Dub ভিডিও পাইপলাইন** (সেমি-অটোমেটেড ভিডিও অনুবাদ ও ডাবিং)
+- **GitHub Single Source of Truth** (ইনস্ট্রাকশন `.md` ফাইল GitHub থেকে fetch করে)
+- **Manual-pause স্টেপ** (ভিডিও/SRT/অডিও আপলোডের জন্য UI-তে পজ)
+- **QA → Fix লুপ** (Claude QA অ্যাজেন্ট এরর লিস্ট বানায়, ফিক্স অ্যাজেন্ট সেগুলো ঠিক করে)
+- **Dynamic Split Failover** (লিমিট এলে টাস্ক ২→৩টি প্যারালাল Claude অ্যাকাউন্টে ভাগ)
 
 ---
 
@@ -46,11 +51,23 @@ claude-workstation/
 ├── profiles/                       # Playwright persistent browser profiles
 │   ├── <account_email>/            # (লগইন করা সেশন/কুকি সেভ থাকে)
 │   └── ...
-└── workspace/
-    ├── downloads/
-    │   └── step_N/                 # Claude থেকে ধরা ফাইল (PDF, CSV, ভিডিও...)
-    └── exports/
-        └── step_N.txt              # প্রতিটি স্টেপের আউটপুট (JSON)
+├── workspace/
+│   ├── downloads/
+│   │   └── step_N/                 # Claude থেকে ধরা ফাইল (PDF, CSV, ভিডিও...)
+│   ├── exports/
+│   │   └── step_N.txt              # প্রতিটি স্টেপের আউটপুট (JSON)
+│   ├── uploads/                    # ম্যানুয়াল আপলোড করা ফাইল (ভিডিও, SRT, অডিও)
+│   └── .github_cache/              # GitHub থেকে fetched instruction .md ফাইলের ক্যাশে
+└── Update data/                    # ভিডিও পাইপলাইনের জন্য ইনস্ট্রাকশন ও রেফারেন্স ফাইল
+    ├── video_dialogue_screenshot_hindi_translation_instructions.md
+    ├── video_sync_instructions.md
+    └── Hindi subtitles+Effect Ad/
+        ├── PLAYBOOK.md
+        ├── PROJECT_STATE.md
+        ├── detect_subtitle_segments.py
+        ├── render_video.py
+        ├── render_video-1.py
+        └── lines_data_CHECKPOINT_0-65s.py
 ```
 
 ---
@@ -114,7 +131,14 @@ claude-workstation/
 | `render_api_keys()` | **Gemini API Keys** — কী পেস্ট, Save & Test, Clear pool, Key Pool টেবিল, Retest, Reset failed |
 | `render_claude_accounts()` | **Claude Profiles** — Add New Account (Create & Login), auth polling, Connected Accounts (Rename/Remove) |
 | `render_data_section()` | **Data** — Downloaded files লিস্ট + Clear History (confirm checkbox + ২টি ডিলিট বাটন) |
-| `render_preferences()` | **Preferences** — Light/Dark থিম টগল |
+| `render_preferences()` | **Preferences** — Light/Dark থিম টগল + **🌐 GitHub Instructions** কনফিগ + **🎬 Video Pipeline Defaults** |
+
+**`render_preferences()`-এর নতুন সাব-সেকশন:**
+
+| সাব-সেকশন | কীভাবে কাজ করে |
+|---|---|
+| **🌐 GitHub Instructions (Single Source of Truth)** | ৩টি text input: Raw base URL (যেমন `https://raw.githubusercontent.com/your-org/your-repo/main`), Translation instructions path, Sync instructions path, Subtitles/Effects path → **💾 Save GitHub config** → `settings.json`-এ `github_instructions_repo` + `github_instruction_files` সেভ |
+| **🎬 Video Pipeline Defaults** | Claude model selectbox (Fable/Opus/Sonnet/Haiku), Effort radio (Low–Max), Thinking toggle → **💾 Save pipeline defaults** → `video_pipeline_model` / `video_pipeline_effort` / `video_pipeline_thinking` সেভ |
 
 ### ৩.৭ কম্পোজার (নতুন টাস্ক স্ক্রিন)
 
@@ -124,7 +148,14 @@ claude-workstation/
 | `load_step_into_composer()` | চিপ ক্লিকে স্টেপের সেটিংস কম্পোজারে লোড (এডিট) |
 | `handle_composer_submit()` | **on_click callback** — কম্পোজার টেক্সট → steps লিস্টে যোগ/আপডেট, টেক্সট ক্লিয়ার |
 | `render_composer()` | চিপ স্ট্রিপ + Run বাটন + **কম্পোজার কার্ড** (টেক্সট এরিয়া + কন্ট্রোল রো এক কার্ডে) |
-| `render_home()` | খালি অবস্থায় **হিরো হেডিং** ("CL Multi-Agent Workstation") + কম্পোজার |
+| `render_home()` | খালি অবস্থায় **হিরো হেডিং** ("CL Multi-Agent Workstation") + **🎬 Video Dubbing Pipeline preset বাটন** + কম্পোজার |
+
+**home ভিউ-র নতুন এলিমেন্ট (খালি অবস্থায়):**
+
+| এলিমেন্ট | কীভাবে কাজ করে |
+|---|---|
+| **🚀 Start Video Dubbing Pipeline বাটন** | `start_video_pipeline()` কল করে → `create_video_dubbing_pipeline()` দিয়ে ৯টি স্টেপ বানায় → ব্যাকগ্রাউন্ড থ্রেডে চালায় → `view="running"` |
+| ক্যাপশন | "Requires: 1+ Claude profile(s) connected, GitHub instruction URLs configured in ⚙️ Settings → Preferences" |
 
 **কম্পোজার কার্ডের ভেতরের কন্ট্রোল রো (Claude-এর model-switcher-এর মতো):**
 
@@ -141,8 +172,24 @@ claude-workstation/
 | ফাংশন | কাজ |
 |---|---|
 | `start_run()` | `build_steps_from_session()` → ব্যাকগ্রাউন্ড থ্রেডে `run_orchestrator_in_background()` চালু → `view="running"` |
-| `render_running()` | লাইভ লগ (পার-স্টেপ chat ব্লকে) → স্টপ বাটন (কম্পোজার স্লটে) → সম্পন্ন হলে ফলাফল ব্লক + লিমিট ব্যানার + রিসেট + কম্পোজার |
+| `start_video_pipeline()` | **9-স্টেপ অটো-ডাব পাইপলাইন** চালু করে — `create_video_dubbing_pipeline()` + `github_raw_url()` দিয়ে instruction URL বানায় → `manual_state` তৈরি করে ব্যাকগ্রাউন্ডে চালায় |
+| `render_running()` | **সেন্টারড টাইটেল + ৩-কলাম ইমেজ গ্যালারি** → ম্যানুয়াল আপলোড পজ → লাইভ লগ কনসোল → স্টপ বাটন → শেষে **ফাইনাল ভিডিও প্লেয়ার** + ফলাফল ব্লক + লগ কনসোল |
 | `render_history_run()` | হিস্ট্রি রানের সব স্টেপ ফাইল read-only থ্রেডে |
+| `save_manual_upload()` | ম্যানুয়াল আপলোডের ফাইল `workspace/uploads/`-এ সেভ → `manual_state["uploaded_paths"]`-এ যোগ → `ready` event set |
+| `find_latest_video()` | স্টেপ আউটপুট ফাইল থেকে সবচেয়ে নতুন ভিডিও (.mp4/.mov/...) খুঁজে |
+| `step_status_line()` | লগ লাইন পার্স করে `{step, account, status, text}` রো বানায় |
+| `render_log_console()` | স্ক্রলেবল লগ কনসোল — প্রতি লাইনে কালার-কোডেড ব্যাজ (🟢/🔴/🟡) + স্টেপ নম্বর + সক্রিয় অ্যাকাউন্ট |
+
+**`render_running()`-এর নতুন সাব-সেকশন:**
+
+| সাব-সেকশন | কীভাবে কাজ করে |
+|---|---|
+| **সেন্টারড টাইটেল** | `st.markdown` দিয়ে HTML — "**Auto-Dubber Workstation**" h1 (2.2rem, bold, centered) + সাবটাইটেল "9-Step Semi-Automated Video Translation & Dubbing Pipeline" |
+| **ইমেজ গ্যালারি** | ৩টি WhatsApp ওয়ার্কফ্লো ইমেজ ৩-কলাম grid-এ — ক্যাপশনসহ: Steps 1-3 (আপলোড→SRT→Translation), Steps 4-6 (Audio→Sync→Subtitles), Steps 7-9 (QA→Fix→Split) |
+| **ম্যানুয়াল আপলোড পজ** | `manual_state["active"]` True হলে: লেবেল + expected extensions দেখায় → `st.file_uploader` → ফাইল দিলে `save_manual_upload()` → `st.rerun()` |
+| **লাইভ লগ কনসোল** | `render_log_console(log_lines)` — `st.container(border=True, height=340)` স্ক্রলেবল বক্স, সর্বশেষ ১২০ লাইন |
+| **ফাইনাল ভিডিও প্লেয়ার** | সম্পন্ন হলে `find_latest_video(all_files)` → `st.video(final_video)` + পাথ ক্যাপশন |
+| **QA এরর লিস্ট** | QA স্টেপের `error_list` থাকলে `st.expander("🔎 QA Error List")` → `st.code()` |
 
 ### ৩.৯ কাস্টম সাইড প্যানেল (নেটিভ sidebar নেই!)
 
@@ -241,19 +288,60 @@ view = st.session_state["view"]  (ডিফল্ট "home")
 
 ### ৪.৫ `modules/orchestrator.py` — পাইপলাইন রানার (মস্তিষ্ক)
 
+**ডেটা মডেল (৩টি dataclass):**
+
+| মডেল | ফিল্ডসমূহ | কাজ |
+|---|---|---|
+| `PipelineStep` | `step_id`, `engine`, `target`, `prompt_template`, `pass_files`, `max_retries`, `timeout_sec`, `model_name`, `performance_style`, `effort`, `thinking`, `step_type`, `manual_label`, `expected_extensions`, `file_key`, `github_instruction_url`, `error_context_key`, `fixed_step_id`, `split_parallel_accounts`, `split_retry_accounts`, `split_chunk_index`, `split_total_chunks` | পাইপলাইনের একটি নোড |
+| `StepResult` | `step_id`, `engine`, `target`, `output`, `files`, `account_switches`, `model_name`, `performance_style`, `effort`, `thinking`, `accounts_used`, `step_type`, `error_list`, `split_results` | একটি স্টেপের আউটপুট |
+| `ManualUploadDef` | `step_id`, `label`, `file_key`, `expected_extensions`, `description` | ম্যানুয়াল আপলোড স্টেপের সংজ্ঞা |
+
+**নতুন স্টেপ টাইপ (স্টেপ টাইপ কনস্ট্যান্ট):**
+
+| কনস্ট্যান্ট | মান | অর্থ |
+|---|---|---|
+| `STEP_TYPE_MANUAL` | `"manual"` | UI-তে পজ — ইউজার ফাইল আপলোড করবে |
+| `STEP_TYPE_QA` | `"qa"` | QA ক্লড অ্যাজেন্ট — ভিডিও চেক করে এরর লিস্ট বানায় |
+| `STEP_TYPE_FIX` | `"fix"` | ফিক্স ক্লড অ্যাজেন্ট — QA-এর এরর লিস্ট ইনপুট পেয়ে ঠিক করে |
+| `STEP_TYPE_SPLIT` | `"split"` | ডাইনামিক স্প্লিট — লিমিট এলে ২→৩ প্যারালাল অ্যাকাউন্ট |
+
+**মূল ফাংশন:**
+
 | ফাংশন | কাজ |
 |---|---|
-| `run(steps, stop_event)` | সিকুয়েন্সিয়াল: স্টেপ → ইঞ্জিন → `_export()` → `{previous_output}` পাস |
+| `run(steps, stop_event, manual_state)` | সিকুয়েন্সিয়াল: স্টেপ → ইঞ্জিন → `_export()` → `{previous_output}` পাস; ম্যানুয়াল স্টেপে `_run_manual_step()`, QA/Fix-এ `_run_qa_fix_step()`, স্প্লিটে `_run_split_strategy()` |
+| `create_video_dubbing_pipeline()` | **9-স্টেপ অটো-ডাব পাইপলাইন ফ্যাক্টরি** — `claude_accounts` লিস্ট + ৩টি GitHub URL + মডেল/এফোর্ট/থিংকিং নিয়ে ৯টি `PipelineStep` বানায় |
+| `render_pipeline_template()` | স্ট্যাটিক টেমপ্লেট রেন্ডার — `{chunk}`/`{chunks}` placeholder সাবস্টিটিউট |
+| `fetch_github_instruction(raw_url)` | **GitHub Single Source of Truth** — raw URL থেকে `.md` fetch → `workspace/.github_cache/`-এ hash-keyed ক্যাশে; GitHub down থাকলে ক্যাশে ফলব্যাক |
+| `_run_manual_step(step)` | `manual_state` dict + `threading.Event` — স্টেপের লেবেল/extensions সেট → UI-এর `ready` event-এর জন্য পোল (০.৫s) → আপলোডেড ফাইল পাথ রিটার্ন |
+| `_run_qa_fix_step(step, ...)` | QA/Fix উভয়ই — QA হলে আউটপুট থেকে `_extract_error_list()` → `_context[error_context_key]`-এ সেভ; Fix হলে `{qa_errors}` প্লেসহোল্ডার QA এরর লিস্ট দিয়ে রিপ্লেস |
+| `_run_split_strategy(step, ...)` | লিমিট ডিটেক্ট করলে টাস্ক **২টি প্যারালাল ক্লড অ্যাকাউন্টে** (`asyncio.gather`) ভাগ — আবার লিমিট হলে **৩টিতে** |
 | `_run_claude_step()` | **Strict handover** + failover: লিমিট → partial output → `next_profile_after()` → প্রসঙ্গ ইনজেক্ট → শেষে ড্রাইভার বন্ধ |
 | `_run_gemini_step()` | `gemini.generate()` + attribution |
 | `_with_attribution()` | `[Generated by: account_1, account_2 using Sonnet 5 · effort: High]` |
-| `_render_prompt()` | `{previous_output}`, `{file_path}`, `{file_paths}` সাবস্টিটিউট |
-| `_export()` | `workspace/exports/step_N.txt` — output + মেটাডেটা JSON |
-| `run_orchestrator_in_background()` | **Async/sync ব্রিজ** — আলাদা থ্রেড + `asyncio.new_event_loop()` |
+| `_render_prompt()` | `{previous_output}`, `{file_path}`, `{file_paths}` + `_context`-এর সব কী (`{source_video}`, `{turboscribe_srt}`, `{omnivoice_audio}`, `{qa_errors}`) সাবস্টিটিউট |
+| `_export()` | `workspace/exports/step_N.txt` — output + মেটাডেটা JSON (`step_type` ও `error_list` সহ) |
+| `run_orchestrator_in_background()` | **Async/sync ব্রিজ** — আলাদা থ্রেড + `asyncio.new_event_loop()`; `manual_state` dict পাস করা যায় |
+
+**`create_video_dubbing_pipeline()` — 9-স্টেপ লেআউট:**
+
+| স্টেপ | টাইপ | টার্গেট | কী করে |
+|---|---|---|---|
+| 1 | `manual` | — | Upload Source Video (.mp4/.mov/...) |
+| 2 | `manual` | — | Upload Turboscribe SRT (.srt) |
+| 3 | `claude` | account[0] | Agent 1: `video_dialogue_screenshot_hindi_translation_instructions.md` GitHub থেকে → স্ক্রিনশট ZIP + হিন্দি অনুবাদ .md |
+| 4 | `manual` | — | Upload OmniVoice Audio (.wav/.mp3) |
+| 5 | `claude` | account[1] | Agent 2: `video_sync_instructions.md` → ছবি+অডিও+SRT সিঙ্ক করা ভিডিও |
+| 6 | `claude` | account[2] | Agent 3: হিন্দি সাবটাইটেল + Effect Ads রেন্ডার (PLAYBOOK.md) |
+| 7 | `qa` | account[3] | Agent 4: QA চেক — `ERRORS:` ফরম্যাটে এরর লিস্ট (`error_context_key="qa_errors"`) |
+| 8 | `fix` | account[4] | Agent 5: `{qa_errors}` দিয়ে ভুল ঠিক করে (`fixed_step_id=7`) |
+| 9 | `split` | — | ফেইলওভার: স্টেপ ৮-এ লিমিট হলে ২টি (তখন ৩টি) প্যারালাল ক্লড অ্যাকাউন্টে ভাগ (স্টেপ ১০/১১ আচরণ) |
 
 ---
 
 ## ৫. ডেটা ফ্লো (এক নজরে)
+
+### ৫.১ ক্লাসিক পাইপলাইন ফ্লো (কম্পোজার → রান)
 
 ```
 [কম্পোজার (home ভিউ)]
@@ -288,11 +376,87 @@ view = st.session_state["view"]  (ডিফল্ট "home")
    date-গ্রুপড রান লিস্ট → ক্লিকে read-only থ্রেড (এক রানের সব স্টেপ)
 ```
 
+### ৫.২ 9-স্টেপ ভিডিও পাইপলাইন ফ্লো (Auto-Dubber)
+
+```
+[home ভিউ] 🚀 Start Video Dubbing Pipeline বাটন
+        │
+        ▼
+start_video_pipeline()
+   ├── accounts = account_manager.list_profiles()
+   ├── instruction URLs = github_raw_url(settings.github_instruction_files.*)
+   ├── steps = create_video_dubbing_pipeline(accounts, urls, model, effort, thinking)
+   ├── manual_state = {"active": False, "ready": threading.Event(), ...}
+   └── run_orchestrator_in_background(steps, manual_state=manual_state)
+        │
+        ▼
+[Background thread] Orchestrator.run(steps, manual_state)
+
+   স্টেপ ১ (manual) ──→ manual_state.active=True → [UI পজ: আপলোড ভিডিও]
+        │                        ↑ ইউজার ফাইল দিলে ready.set()
+        ▼                        └── save_manual_upload() → workspace/uploads/
+   স্টেপ ২ (manual) ──→ [UI পজ: আপলোড SRT]
+        │
+        ▼
+   স্টেপ ৩ (claude) ──→ fetch_github_instruction(translation_url) → প্রম্পটে প্রিপেন্ড
+        │              → ClaudeDriver → স্ক্রিনশট ZIP + হিন্দি অনুবাদ .md
+        │
+        ▼
+   স্টেপ ৪ (manual) ──→ [UI পজ: আপলোড OmniVoice অডিও]
+        │
+        ▼
+   স্টেপ ৫ (claude) ──→ fetch_github_instruction(sync_url) → সিঙ্ক করা ভিডিও
+        │
+        ▼
+   স্টেপ ৬ (claude) ──→ fetch_github_instruction(subtitles_url) → হিন্দি সাবটাইটেল + Effects
+        │
+        ▼
+   স্টেপ ৭ (qa) ──────→ Claude QA অ্যাজেন্ট → _extract_error_list() → _context["qa_errors"]
+        │
+        ▼
+   স্টেপ ৮ (fix) ─────→ {qa_errors} প্রম্পটে → ফিক্স অ্যাজেন্ট → ঠিক করা ভিডিও
+        │
+        ▼
+   স্টেপ ৯ (split) ───→ limit_accounts চেক
+                          ├── কোনো লিমিট নেই → "nothing to split"
+                          ├── লিমিট আছে → ২টি প্যারালাল chunk (স্টেপ ১০)
+                          └── আবার লিমিট → ৩টি প্যারালাল chunk (স্টেপ ১১)
+        │
+        ▼
+[running ভিউ]  সেন্টারড টাইটেল + গ্যালারি → লগ কনসোল → ফাইনাল ভিডিও প্লেয়ার
+```
+
+### ৫.৩ স্টেট ম্যানেজমেন্ট — `manual_state` dict (থ্রেড-সেফ হ্যান্ডঅফ)
+
+```
+একটি শেয়ার্ড dict — অর্কেস্ট্রেটর (ব্যাকগ্রাউন্ড থ্রেড) লেখে, UI (main thread) পড়ে:
+
+{
+  "active": bool,             # ম্যানুয়াল স্টেপ অপেক্ষা করছে কিনা
+  "step_id": int,             # কোন স্টেপ
+  "label": str,               # "Upload Source Video" ইত্যাদি
+  "file_key": str,            # "source_video" / "turboscribe_srt" / "omnivoice_audio"
+  "expected_extensions": str, # ".mp4,.mov,..." / ".srt" / ".wav,.mp3"
+  "uploaded_paths": [..],     # UI এখানে absolute পাথ লেখে
+  "ready": threading.Event()  # UI ফাইল দিলে set() করে
+}
+
+ফ্লো:
+1. অর্কেস্ট্রেটর: active=True + মেটাডেটা সেট → ready.clear() → ready.wait() লুপ (০.৫s পোল)
+2. UI: render_running() দেখে active → file_uploader দেখায় → save_manual_upload()
+   → uploaded_paths-এ পাথ যোগ → ready.set()
+3. অর্কেস্ট্রেটর: ready.is_set() → পাথ পড়ে → active=False → পরের স্টেপে চলে
+
+কেন থ্রেড-সেফ: Streamlit sync main thread + অর্কেস্ট্রেটর আলাদা daemon থ্রেড —
+দুটোই একই dict-এ access করে, তাই শুধু threading.Event + list-append ব্যবহৃত
+(কোনো সরাসরি st.session_state রাইট থ্রেড থেকে করা হয় না)।
+```
+
 ---
 
 ## ৬. কনফিগারেশন ফাইল
 
-### `config/settings.json` — ১৭টি কী:
+### `config/settings.json` — কীগুলো:
 
 | কী | ডিফল্ট | অর্থ |
 |---|---|---|
@@ -305,8 +469,16 @@ view = st.session_state["view"]  (ডিফল্ট "home")
 | `gemini_default_model` | `gemini-3.6-flash` | ডিফল্ট Gemini মডেল |
 | `gemini_test_models` | ৫টি মডেল | কী টেস্টে ফলব্যাক অর্ডার |
 | `profiles_dir` / `downloads_dir` / `exports_dir` | পাথ | ডিরেক্টরি |
+| `github_cache_dir` | `workspace/.github_cache` | GitHub ইনস্ট্রাকশন ক্যাশে ডিরেক্টরি |
 | `limit_detection_phrases` | ৭টি ফ্রেজ | লিমিট ব্যানার চেনার টেক্সট |
 | `known_gemini_models` | ৫টি | UI ড্রপডাউনের মডেল |
+| `github_instructions_repo` | `https://raw.githubusercontent.com/your-org/your-repo/main` | ইনস্ট্রাকশন `.md`-র raw base URL (Single Source of Truth) |
+| `github_instructions_branch` | `main` | GitHub ব্রাঞ্চ |
+| `github_instruction_files` | ৩টি পাথ | `translation` / `sync` / `subtitles` ইনস্ট্রাকশন ফাইলের রিপো-রিলেটিভ পাথ |
+| `split_strategy` | — | `max_parallel_accounts` (৩), `min_chunk_duration_sec` (৩০), `initial_split_count` (২), `secondary_split_count` (৩) |
+| `video_pipeline_model` | `Sonnet 5` | অটো-ডাব পাইপলাইনের Claude মডেল |
+| `video_pipeline_effort` | `High` | পাইপলাইন এফোর্ট লেভেল |
+| `video_pipeline_thinking` | `true` | পাইপলাইনে Thinking টগল |
 
 ### `config/api_keys.json` — কী রেকর্ড ফরম্যাট:
 
@@ -357,20 +529,19 @@ Streamlit UI  (st.status + st.rerun polling)
 |---|---|---|
 | Frontend | থিম ও CSS | 5 (টোকেন, টেমপ্লেট, ইনজেকশন, chrome-hiding, hero) |
 | Frontend | কাস্টম সাইড প্যানেল | 5 (toggle, wordmark, New Task, Search+History, footer+gear) |
-| Frontend | home ভিউ | 5 (হিরো, চিপ, Run, কম্পোজার কার্ড, কন্ট্রোল রো) |
+| Frontend | home ভিউ | 6 (হিরো, **Video Pipeline preset**, চিপ, Run, কম্পোজার কার্ড, কন্ট্রোল রো) |
 | Frontend | কম্পোজার কন্ট্রোল রো | 5 (attach, Engine, Account/Model, Advanced, send) |
-| Frontend | running ভিউ | 5 (লাইভ থ্রেড, স্টপ, ফলাফল, ব্যানার, রিসেট+কম্পোজার) |
-| Frontend | Settings ভিউ | 4 (API Keys, Profiles, Data, Preferences) |
+| Frontend | running ভিউ | 8 (সেন্টারড টাইটেল, গ্যালারি, ম্যানুয়াল আপলোড পজ, লগ কনসোল, স্টপ, ফলাফল, ভিডিও প্লেয়ার, রিসেট+কম্পোজার) |
+| Frontend | Settings ভিউ | 6 (API Keys, Profiles, Data, Preferences, **GitHub Config**, **Pipeline Defaults**) |
 | Frontend | history ভিউ | 2 (রান থ্রেড, ব্যাক বাটন) |
 | Backend | `key_manager.py` | ১ ক্লাস + ১ dataclass + ৩ ক্লাসিফায়ার |
 | Backend | `account_manager.py` | ১ ক্লাস + ~৯ ফাংশন |
 | Backend | `claude_driver.py` | ১ ক্লাস + ~২০ ফাংশন |
 | Backend | `gemini_driver.py` | ১ ক্লাস + ৩ ফাংশন |
-| Backend | `orchestrator.py` | ১ ক্লাস + ৩ ডেটা মডেল + ব্রিজ |
-| Config | `settings.json` | ১৭ কী |
+| Backend | `orchestrator.py` | ১ ক্লাস + ৩ ডেটা মডেল + ৪ স্টেপ টাইপ + ১২+ ফাংশন + ব্রিজ |
+| Backend | **9-স্টেপ ফ্যাক্টরি** | `create_video_dubbing_pipeline()` → ৩ manual + ৩ claude + ১ QA + ১ fix + ১ split |
+| Config | `settings.json` | ২৪+ কী (GitHub + split + pipeline ডিফল্টসহ) |
 | Config | `api_keys.json` | কী-রেকর্ড লিস্ট |
-
----
 
 ## ৯. গুরুত্বপূর্ণ ডিজাইন সিদ্ধান্ত
 
@@ -382,6 +553,11 @@ Streamlit UI  (st.status + st.rerun polling)
 6. **Partial output capture** — লিমিটে আংশিক কাজ হারায় না।
 7. **Stability-checked completion** — "Stop গেছে + টেক্সট স্থির" — আধা-জেনারেটেড টেক্সট কখনো কালেক্ট হয় না।
 8. **`width="stretch"`** — `use_container_width` deprecation-মুক্ত (Streamlit 1.62+)।
+9. **GitHub = Single Source of Truth** — ইনস্ট্রাকশন `.md` কখনো UI-তে hardcode নয়; সর্বদা GitHub raw URL থেকে fetch + লোকাল ক্যাশে (অফলাইন ফলব্যাক)।
+10. **Manual pause ≠ pipeline break** — `manual_state` dict + `threading.Event` — ব্যাকগ্রাউন্ড থ্রেড অপেক্ষা করে, UI-তে পজ প্যানেল দেখায়; আপলোডের পর থ্রেড স্টেট হারানো ছাড়াই চালিয়ে যায়।
+11. **Split strategy = টাস্ক ভাগ, অ্যাকাউন্ট ভাগ নয়** — একই ফিক্স কাজ ২/৩টি টুকরায় ভাগ হয় (`split_chunk_index`/`split_total_chunks`), প্রতিটি টুকরা ভিন্ন Claude অ্যাকাউন্টে প্যারালাল চলে — টোকেন/রেট লিমিট স্প্রেড হয়।
+12. **QA → Fix ডেটা-চেইন** — QA স্টেপ `_extract_error_list()` দিয়ে `ERRORS:` ব্লক আলাদা করে `_context["qa_errors"]`-এ রাখে; ফিক্স স্টেপ শুধু সেই লিস্ট পায় — পুরো আউটপুট নয় (টোকেন বাঁচায়, প্রসঙ্গ পরিষ্কার থাকে)।
+13. **Split chunk স্টেপ আইডি এনকোডিং** — চাঙ্ক স্টেপ আইডি `step_id*10+idx` (৯১, ৯২, ৯৩...) এবং retry `step_id*100+idx` — রান হিস্ট্রিতে কোন চাঙ্ক কোন ফ্যান-আউট থেকে এসেছে তা চেনা যায়।
 
 ---
 
@@ -390,11 +566,35 @@ Streamlit UI  (st.status + st.rerun polling)
 ```bash
 cd /home/shafin/Desktop/BlueprintTube_Project/Claude-workstation
 source .venv/bin/activate
-python -m py_compile app.py modules/*.py        # সিনট্যাক্স চেক
-streamlit run app.py                             # UI চালু
+
+# ১. সিনট্যাক্স চেক
+python -m py_compile app.py modules/*.py
+
+# ২. পাইপলাইন ফ্যাক্টরি পরীক্ষা
+python -c "
+from modules.orchestrator import create_video_dubbing_pipeline
+steps = create_video_dubbing_pipeline(
+    claude_accounts=['a1','a2','a3','a4','a5'],
+    translation_instructions_url='https://example.com/t.md',
+    sync_instructions_url='https://example.com/s.md',
+    subtitles_instructions_url='https://example.com/p.md',
+)
+assert len(steps) == 9
+manual = [s for s in steps if s.step_type == 'manual']
+qa = [s for s in steps if s.step_type == 'qa']
+fix = [s for s in steps if s.step_type == 'fix']
+split = [s for s in steps if s.step_type == 'split']
+assert len(manual) == 3 and len(qa) == 1 and len(fix) == 1 and len(split) == 1
+print('9-step pipeline factory: OK')
+"
+
+# ৩. UI চালু
+streamlit run app.py
 ```
 
 - কোনো `NameError`/`ImportError` নেই
-- http://localhost:8501 খুললে: বামে কাস্টম প্যানেল (« বাটন দিয়ে collapse), ডানে home ভিউ (হিরো + কম্পোজার)
-- Settings gear → ৪টি সেকশন কাজ করে
-- স্টেপ যোগ → Run → running ভিউ → ফলাফল + হিস্ট্রিতে রান দেখা যায়
+- http://localhost:8501 খুললে: বামে কাস্টম প্যানেল (« বাটন দিয়ে collapse), ডানে home ভিউ (হিরো + Video Pipeline বাটন + কম্পোজার)
+- Settings gear → Preferences → GitHub Instructions + Pipeline Defaults দেখা যায়
+- 🚀 Start Video Dubbing Pipeline → running ভিউতে টাইটেল + গ্যালারি + লগ কনসোল দেখা যায়
+- স্টেপ ১ পৌঁছালে `⏸️ Upload Source Video required` প্যানেল আসে
+- স্টেপ যোগ → Run → ক্লাসিক পাইপলাইন → ফলাফল + হিস্ট্রিতে রান দেখা যায়

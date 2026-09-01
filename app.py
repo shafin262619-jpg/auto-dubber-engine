@@ -86,7 +86,7 @@ def load_settings() -> dict:
             "gemini-2.0-flash",
         ],
         # GitHub single source of truth for instruction files
-        "github_instructions_repo": "https://raw.githubusercontent.com/your-org/your-repo/main",
+        "github_instructions_repo": "https://raw.githubusercontent.com/shafin262619-jpg/auto-dubber-engine/main",
         "github_instructions_branch": "main",
         "github_instruction_files": {
             "translation": "Update data/video_dialogue_screenshot_hindi_translation_instructions.md",

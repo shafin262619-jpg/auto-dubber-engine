@@ -39,6 +39,7 @@ import asyncio
 import hashlib
 import json
 import threading
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -161,10 +162,6 @@ class PipelineCancelled(RuntimeError):
     """Raised when the user requests the running pipeline to stop."""
 
 
-class ManualUploadRequired(RuntimeError):
-    """Raised internally when a manual step has no UI-provided files yet."""
-
-
 def _dedupe(items: Sequence[str]) -> List[str]:
     """Return a de-duplicated list preserving order."""
     seen: set = set()
@@ -254,7 +251,7 @@ def create_video_dubbing_pipeline(
                 "Deliver: the screenshots ZIP and the Hindi translation .md file "
                 "as downloadable artifacts."
             ),
-            pass_files=FILES_NONE,
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
             model_name=model_name,
             effort=effort,
             thinking=thinking,
@@ -284,10 +281,10 @@ def create_video_dubbing_pipeline(
                 "INPUTS AVAILABLE:\n"
                 "- Audio: {omnivoice_audio}\n"
                 "- SRT: {turboscribe_srt}\n"
-                "- Screenshots ZIP (from Step 3): {previous_files}\n\n"
+                "- Screenshots ZIP (from Step 3): {file_paths}\n\n"
                 "Deliver: the synced video file as a downloadable artifact."
             ),
-            pass_files=FILES_NONE,
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
             model_name=model_name,
             effort=effort,
             thinking=thinking,
@@ -304,12 +301,12 @@ def create_video_dubbing_pipeline(
                 "the synced video produced in Step 5. Use the companion playbook "
                 "and renderer scripts referenced by the instruction file.\n\n"
                 "INPUTS AVAILABLE:\n"
-                "- Synced video (from Step 5): {previous_files}\n"
+                "- Synced video (from Step 5): {file_paths}\n"
                 "- Hindi translation (from Step 3): {previous_output}\n\n"
                 "Deliver: the final rendered video with Hindi subtitles + effect "
                 "ads as a downloadable artifact."
             ),
-            pass_files=FILES_NONE,
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
             model_name=model_name,
             effort=effort,
             thinking=thinking,
@@ -326,7 +323,7 @@ def create_video_dubbing_pipeline(
                 "Step 6 (and its source SRT/audio) and list every synchronization "
                 "or generation error you can find.\n\n"
                 "INPUTS AVAILABLE:\n"
-                "- Final video (from Step 6): {previous_files}\n"
+                "- Final video (from Step 6): {file_paths}\n"
                 "- SRT: {turboscribe_srt}\n"
                 "- Audio: {omnivoice_audio}\n\n"
                 "OUTPUT FORMAT (exactly):\n"
@@ -336,7 +333,7 @@ def create_video_dubbing_pipeline(
                 "If everything is correct, output exactly:\n"
                 "ERRORS:\nNONE"
             ),
-            pass_files=FILES_NONE,
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
             model_name=model_name,
             effort=effort,
             thinking=thinking,
@@ -354,12 +351,12 @@ def create_video_dubbing_pipeline(
                 "sections (fix locally, do not rebuild the whole timeline).\n\n"
                 "QA ERROR LIST:\n{qa_errors}\n\n"
                 "INPUTS AVAILABLE:\n"
-                "- Final video (from Step 6): {previous_files}\n"
+                "- Final video (from Step 6): {file_paths}\n"
                 "- SRT: {turboscribe_srt}\n"
                 "- Audio: {omnivoice_audio}\n\n"
                 "Deliver: the corrected final video as a downloadable artifact."
             ),
-            pass_files=FILES_NONE,
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
             model_name=model_name,
             effort=effort,
             thinking=thinking,
@@ -397,6 +394,7 @@ def render_pipeline_template(
     first_file = prev_files[0] if prev_files else ""
     rendered = rendered.replace("{file_path}", first_file)
     rendered = rendered.replace("{file_paths}", "\n".join(prev_files))
+    rendered = rendered.replace("{previous_files}", "\n".join(prev_files))
     return rendered
 
 
@@ -469,6 +467,7 @@ class Orchestrator:
         self.limit_accounts = []
         previous_output: str = ""
         previous_files: List[str] = []
+        self._run_files: List[str] = []  # accumulates ALL files across the run
         results: List[StepResult] = []
         self._context = {}
 
@@ -479,7 +478,8 @@ class Orchestrator:
             if step.step_type == STEP_TYPE_MANUAL:
                 files = await self._run_manual_step(step)
                 self._context[step.file_key] = "\n".join(files)
-                previous_files = _dedupe(previous_files + files)
+                self._run_files = _dedupe(self._run_files + files)
+                previous_files = self._run_files
                 results.append(
                     StepResult(
                         step_id=step.step_id,
@@ -496,7 +496,8 @@ class Orchestrator:
                 result = await self._run_qa_fix_step(step, previous_output, previous_files)
                 results.append(result)
                 previous_output = result.output
-                previous_files = result.files
+                self._run_files = _dedupe(self._run_files + result.files)
+                previous_files = self._run_files
                 self._export(step, result)
                 continue
 
@@ -505,6 +506,8 @@ class Orchestrator:
                 results.extend(split_results)
                 for sr in split_results:
                     self._export(sr, sr)
+                    self._run_files = _dedupe(self._run_files + sr.files)
+                previous_files = self._run_files
                 continue
 
             # classic claude / gemini agent step
@@ -525,7 +528,8 @@ class Orchestrator:
 
             results.append(result)
             previous_output = result.output
-            previous_files = result.files
+            self._run_files = _dedupe(self._run_files + result.files)
+            previous_files = self._run_files
             self._export(step, result)
 
         self.log(f"🏁 Pipeline finished: {len(results)} step(s) executed")
@@ -554,9 +558,14 @@ class Orchestrator:
                 self.log(f"📥 Using cached GitHub instruction for {raw_url}")
                 return cache_file.read_text(encoding="utf-8")
 
+            # URL-encode the path portion to handle spaces/special chars
+            parsed = urllib.parse.urlparse(raw_url)
+            safe_path = urllib.parse.quote(parsed.path, safe="/@:!$&'()*+,;=-._~")
+            encoded_url = urllib.parse.urlunparse((parsed.scheme, parsed.netloc, safe_path, parsed.params, parsed.query, parsed.fragment))
+
             def _fetch() -> str:
                 req = urllib.request.Request(
-                    raw_url, headers={"User-Agent": "AutoDubber-Orchestrator/1.0"}
+                    encoded_url, headers={"User-Agent": "AutoDubber-Orchestrator/1.0"}
                 )
                 with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 — user-configured URL
                     return resp.read().decode("utf-8")
@@ -829,13 +838,17 @@ class Orchestrator:
             retry_targets = [a for a in healthy if a not in chunk_targets]
             retry_targets = (retry_targets + healthy)[: step.split_retry_accounts]
             async def retry_chunk(idx: int, account: str) -> StepResult:
+                retry_prompt = render_pipeline_template(
+                    base_fix_prompt,
+                    context={"chunk": str(idx + 1), "chunks": str(step.split_retry_accounts)},
+                    previous_output=previous_output,
+                    previous_files=previous_files,
+                )
                 sub_step = PipelineStep(
                     step_id=step.step_id * 100 + idx + 1,
                     engine=ENGINE_CLAUDE,
                     target=account,
-                    prompt_template=base_fix_prompt.replace(
-                        "chunk {chunk} of {chunks}", f"chunk {idx + 1} of {step.split_retry_accounts}"
-                    ),
+                    prompt_template=retry_prompt,
                     pass_files=FILES_NONE,
                     model_name=step.model_name,
                     effort=step.effort,
@@ -846,7 +859,7 @@ class Orchestrator:
                 )
                 try:
                     return await self._run_claude_step(
-                        sub_step, sub_step.prompt_template, list(previous_files)
+                        sub_step, retry_prompt, list(previous_files)
                     )
                 except Exception as exc:  # noqa: BLE001
                     return StepResult(
@@ -1013,15 +1026,17 @@ class Orchestrator:
 
     def _render_prompt(self, template: str, previous_output: str, previous_files: List[str]) -> str:
         """Substitute {previous_output}, {file_path}, {file_paths} and any
-        shared pipeline context keys ({source_video}, {turboscribe_srt}, …)."""
-        rendered = template
-        for key, value in self._context.items():
-            rendered = rendered.replace("{" + key + "}", value or "")
-        rendered = rendered.replace("{previous_output}", previous_output or "")
-        first_file = previous_files[0] if previous_files else ""
-        rendered = rendered.replace("{file_path}", first_file)
-        rendered = rendered.replace("{file_paths}", "\n".join(previous_files))
-        return rendered
+        shared pipeline context keys ({source_video}, {turboscribe_srt}, …).
+
+        Delegates to the module-level :func:`render_pipeline_template` so both
+        the run loop and the split-strategy chunks share one rendering path.
+        """
+        return render_pipeline_template(
+            template,
+            context=self._context,
+            previous_output=previous_output,
+            previous_files=previous_files,
+        )
 
     @staticmethod
     def _resolve_files(mode: str, previous_files: List[str]) -> List[str]:
