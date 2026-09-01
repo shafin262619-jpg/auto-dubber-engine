@@ -32,23 +32,47 @@ from .account_manager import AccountManager
 # JavaScript that returns the innerText of the last assistant message carrying
 # a "Copy" button — only fully-rendered, completed messages have one, so this
 # always returns the final collectable output and never partial streaming text.
+#
+# Robustness notes (Claude.ai DOM drift):
+# * Walks up from the LAST Copy button (max 20 levels) looking for the message
+#   text block (`.font-claude-message`); returns that block's innerText only —
+#   NOT the whole ancestor container (which can swallow the entire thread).
+# * Timestamp-only footers ("just now", "10:42 AM") are treated as empty so
+#   they are never mistaken for real assistant output.
+# * Falls back to the nearest message-like ancestor, then to the last
+#   non-timestamp `.font-claude-message` block on the page.
 _LAST_COMPLETED_MESSAGE_JS: str = """
 () => {
+  const isTs = (t) => /^(just now|\\d{1,2}:\\d{2}( ?[AP]M)?)$/i.test((t||'').trim());
   const btns = Array.from(document.querySelectorAll(
     'button[aria-label*="Copy" i], [data-testid*="copy" i]'
   ));
-  if (!btns.length) return '';
-  const btn = btns[btns.length - 1];
-  let el = btn;
-  for (let i = 0; i < 10 && el; i++) {
-    el = el.parentElement;
-    if (!el) continue;
-    if (el.querySelector('[class*="font-claude-message"]')) {
-      const t = el.innerText;
-      return t ? t : '';
+  if (btns.length) {
+    const btn = btns[btns.length - 1];
+    // 1) Walk up from the Copy button to the message text block.
+    for (let el = btn.parentElement, i = 0; el && i < 20; el = el.parentElement, i++) {
+      const inner = el.querySelector('[class*="font-claude-message"]');
+      if (inner) {
+        const t = (inner.innerText || '').trim();
+        return (t && !isTs(t)) ? t : '';
+      }
+    }
+    // 2) Nearest message-like ancestor.
+    const container = btn.closest(
+      '[role="article"], [data-testid*="message"], [data-is-streaming]'
+    );
+    if (container) {
+      const t = (container.innerText || '').trim();
+      if (t && !isTs(t)) return t;
     }
   }
-  return btn.parentElement ? btn.parentElement.innerText : '';
+  // 3) Last non-timestamp .font-claude-message block on the page.
+  const msgs = Array.from(document.querySelectorAll('[class*="font-claude-message"]'));
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const t = (msgs[i].innerText || '').trim();
+    if (t && !isTs(t)) return t;
+  }
+  return '';
 }
 """
 
@@ -723,34 +747,59 @@ class ClaudeDriver:
         if page is None:
             return ""
 
+        def _clean(text: str) -> str:
+            """Strip UI chrome noise (timestamps, "Copy" labels) from output."""
+            t = (text or "").strip()
+            if not t:
+                return ""
+            # Drop timestamp-only footers ("just now", "10:42 AM", "Yesterday"…).
+            if re.fullmatch(
+                r"(just now|today|yesterday|\d{1,2}:\d{2}( ?[AP]M)?)", t, re.IGNORECASE
+            ):
+                return ""
+            return t
+
         # Primary: last message that has a Copy button (definitely completed).
         try:
             text = await page.evaluate(_LAST_COMPLETED_MESSAGE_JS)
-            if text and text.strip():
-                return text.strip()
+            text = _clean(text)
+            if text:
+                return text
         except Exception:
             pass
 
         # Fallback: elements with the Claude message font class.
         loc = page.locator('[class*="font-claude-message"]')
         count = await loc.count()
-        if count > 0:
-            text = await loc.nth(count - 1).inner_text()
-            return text.strip()
+        for idx in range(count - 1, -1, -1):
+            try:
+                text = _clean(await loc.nth(idx).inner_text())
+            except Exception:
+                continue
+            if text:
+                return text
 
         # Fallback: last container with streaming attribute.
         fallback = page.locator('[data-is-streaming]')
         count = await fallback.count()
-        if count > 0:
-            text = await fallback.nth(count - 1).inner_text()
-            return text.strip()
+        for idx in range(count - 1, -1, -1):
+            try:
+                text = _clean(await fallback.nth(idx).inner_text())
+            except Exception:
+                continue
+            if text:
+                return text
 
         # Last resort: all conversation-turn blocks.
         turns = page.locator('[data-testid*="message"], [role="article"]')
         count = await turns.count()
-        if count > 0:
-            text = await turns.nth(count - 1).inner_text()
-            return text.strip()
+        for idx in range(count - 1, -1, -1):
+            try:
+                text = _clean(await turns.nth(idx).inner_text())
+            except Exception:
+                continue
+            if text:
+                return text
 
         return ""
 
@@ -817,13 +866,62 @@ class ClaudeDriver:
         return saved
 
     async def _attach_files(self, file_paths: List[str]) -> None:
-        """Attach local files to the Claude composer via the hidden file input."""
+        """Attach local files to the Claude composer via the hidden file input.
+
+        Robustness strategy for Claude.ai's dynamic DOM:
+        1. Close any lingering popover first (a leftover portal can hide the input).
+        2. Try the canonical ``input[type="file"]``.
+        3. Fallback: click the paperclip/attach button so the file input mounts,
+           then retry the input.
+        4. If still missing, capture a short page diagnostic so the failure is
+           actionable (login screen? limit screen? UI changed?).
+        """
         page = self._page
         if page is None:
             return
 
+        # 1) Make sure no popover/overlay is blocking the composer.
+        await self._close_popovers()
+
         file_input = page.locator('input[type="file"]').first
-        await file_input.wait_for(state="attached", timeout=15000)
+        try:
+            await file_input.wait_for(state="attached", timeout=8000)
+        except Exception:
+            # 2) The input is usually always in the DOM, but if not, try to
+            #    reveal it by clicking the attach (paperclip) button.
+            self.log("📎 No visible file input yet — clicking the attach button…")
+            attach_btn = page.locator(
+                'button[aria-label*="attach" i], button[aria-label*="upload" i], '
+                '[data-testid*="attach" i], [aria-label*="paperclip" i]'
+            ).first
+            try:
+                if await attach_btn.count() and await attach_btn.is_visible(timeout=3000):
+                    await attach_btn.click(timeout=5000)
+                    await page.wait_for_timeout(1200)
+            except Exception:
+                pass
+            try:
+                await file_input.wait_for(state="attached", timeout=8000)
+            except Exception:
+                # 3) Diagnostic: why can't we attach files?
+                try:
+                    body_text = await page.locator("body").inner_text(timeout=5000)
+                except Exception:
+                    body_text = ""
+                hint = ""
+                lower = body_text.lower()
+                if any(p in lower for p in ("log in", "sign in", "continue with google", "enter your email")):
+                    hint = "the page shows a LOGIN screen — re-login this profile."
+                elif any(p in lower for p in self.settings.get("limit_detection_phrases", [])):
+                    hint = "a limit/error banner is present."
+                elif not lower.strip():
+                    hint = "the page body is empty (page may not have loaded)."
+                else:
+                    hint = "Claude's DOM may have changed — the file input is missing."
+                raise RuntimeError(
+                    f"Could not attach files on '{self._current_account}': {hint}"
+                ) from None
+
         await file_input.set_input_files(file_paths)
         self.log(f"📎 Attached {len(file_paths)} file(s) to composer")
 
