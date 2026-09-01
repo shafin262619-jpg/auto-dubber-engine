@@ -115,6 +115,8 @@ class PipelineStep:
 
     # GitHub single-source-of-truth field (claude agent steps)
     github_instruction_url: str = ""
+    # Multiple instruction URLs — all are fetched and combined (single-claude mode)
+    github_instruction_urls: List[str] = field(default_factory=list)
 
     # QA / Fix fields
     error_context_key: str = ""  # where the QA error list is stored
@@ -379,6 +381,104 @@ def create_video_dubbing_pipeline(
     return steps
 
 
+def create_single_claude_pipeline(
+    claude_account: str,
+    translation_instructions_url: str = "",
+    sync_instructions_url: str = "",
+    subtitles_instructions_url: str = "",
+    model_name: str = "Sonnet 5",
+    effort: str = "High",
+    thinking: bool = True,
+) -> List[PipelineStep]:
+    """Build a minimal 4-step pipeline where ONE Claude does everything.
+
+    Step layout:
+
+    1. manual   — Upload Source Video
+    2. manual   — Upload Turboscribe SRT
+    3. manual   — Upload OmniVoice Audio
+    4. claude   — ONE Claude account receives ALL instruction files (fetched
+                  together from GitHub) plus ALL documents (video, SRT, audio)
+                  in a single conversation, and executes the complete workflow:
+                  screenshots + translation → sync → subtitles + effects → QA
+                  → fixes (self-QA), delivering the final video.
+
+    The ``github_instruction_urls`` list on step 4 makes the orchestrator fetch
+    every instruction markdown and join them into one prompt, so the single
+    Claude always has the full workflow context at once.
+    """
+    instruction_urls: List[str] = []
+    for url in (translation_instructions_url, sync_instructions_url, subtitles_instructions_url):
+        if url:
+            instruction_urls.append(url)
+
+    steps: List[PipelineStep] = [
+        PipelineStep(
+            step_id=1,
+            engine=STEP_TYPE_MANUAL,
+            target="",
+            prompt_template="",
+            step_type=STEP_TYPE_MANUAL,
+            manual_label="Upload Source Video",
+            expected_extensions=".mp4,.mov,.avi,.mkv,.webm",
+            file_key="source_video",
+        ),
+        PipelineStep(
+            step_id=2,
+            engine=STEP_TYPE_MANUAL,
+            target="",
+            prompt_template="",
+            step_type=STEP_TYPE_MANUAL,
+            manual_label="Upload Turboscribe SRT",
+            expected_extensions=".srt",
+            file_key="turboscribe_srt",
+        ),
+        PipelineStep(
+            step_id=3,
+            engine=STEP_TYPE_MANUAL,
+            target="",
+            prompt_template="",
+            step_type=STEP_TYPE_MANUAL,
+            manual_label="Upload OmniVoice Audio",
+            expected_extensions=".wav,.mp3,.m4a,.ogg",
+            file_key="omnivoice_audio",
+        ),
+        PipelineStep(
+            step_id=4,
+            engine=ENGINE_CLAUDE,
+            target=claude_account,
+            prompt_template=(
+                "You are the full-stack video dubbing agent. Below are ALL the "
+                "instruction files for this project — read them all carefully, "
+                "then execute the complete workflow end-to-end in one continuous "
+                "pass, following each instruction in order.\n\n"
+                "INSTRUCTION 1 — Dialogue screenshots + Hindi translation.\n"
+                "INSTRUCTION 2 — Video sync (images + audio + SRT).\n"
+                "INSTRUCTION 3 — Hindi subtitles + Effect Ads render.\n\n"
+                "After producing the final video, run the QA checklist from the "
+                "instructions, fix any issues you find, and deliver the final "
+                "corrected video as a downloadable artifact.\n\n"
+                "ALL INPUTS AVAILABLE (attached):\n"
+                "- Video: {source_video}\n"
+                "- SRT: {turboscribe_srt}\n"
+                "- Audio: {omnivoice_audio}\n\n"
+                "DELIVERABLES:\n"
+                "1. Screenshots ZIP\n"
+                "2. Hindi translation .md\n"
+                "3. Synced video\n"
+                "4. Final video with Hindi subtitles + effect ads (QA'd and fixed)"
+            ),
+            pass_files=FILES_PREVIOUS_DOWNLOADS,
+            model_name=model_name,
+            effort=effort,
+            thinking=thinking,
+            step_type=ENGINE_CLAUDE,
+            github_instruction_urls=instruction_urls,
+        ),
+    ]
+    return steps
+
+
 def render_pipeline_template(
     template: str,
     context: Dict[str, str],
@@ -514,10 +614,9 @@ class Orchestrator:
             prompt = self._render_prompt(step.prompt_template, previous_output, previous_files)
 
             # GitHub single source of truth: fetch & prepend the instruction.
-            if step.github_instruction_url:
-                instruction = await self.fetch_github_instruction(step.github_instruction_url)
-                if instruction:
-                    prompt = f"{instruction}\n\n---\n\n{prompt}"
+            instruction = await self._fetch_all_instructions(step)
+            if instruction:
+                prompt = f"{instruction}\n\n---\n\n{prompt}"
 
             files = self._resolve_files(step.pass_files, previous_files)
 
@@ -578,6 +677,29 @@ class Orchestrator:
         except Exception as exc:  # noqa: BLE001 — never kill the pipeline on a fetch miss
             self.log(f"⚠️ GitHub instruction fetch failed ({exc}); continuing without it.")
             return ""
+
+    async def _fetch_all_instructions(self, step: PipelineStep) -> str:
+        """Fetch every instruction referenced by a step and join them.
+
+        Supports both the legacy single ``github_instruction_url`` and the new
+        ``github_instruction_urls`` list (single-Claude mode) — the list wins.
+        """
+        urls: List[str] = []
+        if step.github_instruction_urls:
+            urls = list(step.github_instruction_urls)
+        elif step.github_instruction_url:
+            urls = [step.github_instruction_url]
+        if not urls:
+            return ""
+
+        blocks: List[str] = []
+        for i, url in enumerate(urls, 1):
+            content = await self.fetch_github_instruction(url)
+            if content:
+                blocks.append(f"### Instruction {i}/{len(urls)}\n\n{content}")
+        if not blocks:
+            return ""
+        return "\n\n---\n\n".join(blocks)
 
     # ------------------------------------------------------------------ #
     #  Manual steps
@@ -644,10 +766,9 @@ class Orchestrator:
             step.prompt_template = step.prompt_template.replace("{qa_errors}", qa_errors)
 
         prompt = self._render_prompt(step.prompt_template, previous_output, previous_files)
-        if step.github_instruction_url:
-            instruction = await self.fetch_github_instruction(step.github_instruction_url)
-            if instruction:
-                prompt = f"{instruction}\n\n---\n\n{prompt}"
+        instruction = await self._fetch_all_instructions(step)
+        if instruction:
+            prompt = f"{instruction}\n\n---\n\n{prompt}"
 
         driver = self._new_claude_driver()
         try:

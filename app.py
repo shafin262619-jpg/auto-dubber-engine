@@ -53,6 +53,7 @@ from modules.orchestrator import (
     PipelineStep,
     StepResult,
     create_video_dubbing_pipeline,
+    create_single_claude_pipeline,
     run_orchestrator_in_background,
 )
 
@@ -269,29 +270,43 @@ def github_raw_url(rel_path: str) -> str:
     return repo
 
 
-def start_video_pipeline() -> None:
-    """Build and launch the 9-step auto-dubbing pipeline."""
+def _launch_video_pipeline(mode: str = "multi") -> None:
+    """Build and launch the video pipeline in multi-agent or single-Claude mode.
+
+    Args:
+        mode: ``"multi"``  → 9-step pipeline with 5 separate Claude agents.
+              ``"single"`` → 4-step pipeline (3 manual + 1 Claude doing everything).
+    """
     accounts = account_manager.list_profiles()
     if not accounts:
         st.error("No Claude accounts connected. Add one in ⚙️ Settings → Claude Profiles first.")
         return
 
     instruction_files = SETTINGS.get("github_instruction_files", {})
-    base_url = github_raw_url("")
 
-    steps = create_video_dubbing_pipeline(
-        claude_accounts=accounts,
-        translation_instructions_url=github_raw_url(
-            str(instruction_files.get("translation", ""))
-        ),
-        sync_instructions_url=github_raw_url(str(instruction_files.get("sync", ""))),
-        subtitles_instructions_url=github_raw_url(
-            str(instruction_files.get("subtitles", ""))
-        ),
-        model_name=str(SETTINGS.get("video_pipeline_model", "Sonnet 5")),
-        effort=str(SETTINGS.get("video_pipeline_effort", "High")),
-        thinking=bool(SETTINGS.get("video_pipeline_thinking", True)),
-    )
+    def _url(key: str) -> str:
+        return github_raw_url(str(instruction_files.get(key, "")))
+
+    if mode == "single":
+        steps = create_single_claude_pipeline(
+            claude_account=accounts[0],
+            translation_instructions_url=_url("translation"),
+            sync_instructions_url=_url("sync"),
+            subtitles_instructions_url=_url("subtitles"),
+            model_name=str(SETTINGS.get("video_pipeline_model", "Sonnet 5")),
+            effort=str(SETTINGS.get("video_pipeline_effort", "High")),
+            thinking=bool(SETTINGS.get("video_pipeline_thinking", True)),
+        )
+    else:
+        steps = create_video_dubbing_pipeline(
+            claude_accounts=accounts,
+            translation_instructions_url=_url("translation"),
+            sync_instructions_url=_url("sync"),
+            subtitles_instructions_url=_url("subtitles"),
+            model_name=str(SETTINGS.get("video_pipeline_model", "Sonnet 5")),
+            effort=str(SETTINGS.get("video_pipeline_effort", "High")),
+            thinking=bool(SETTINGS.get("video_pipeline_thinking", True)),
+        )
 
     log_q: "queue.Queue[str]" = queue.Queue()
     events_q: "queue.Queue[tuple[str, object]]" = queue.Queue()
@@ -323,6 +338,16 @@ def start_video_pipeline() -> None:
     }
     st.session_state["view"] = "running"
     st.rerun()
+
+
+def start_video_pipeline() -> None:
+    """Convenience wrapper — launch the classic 9-step multi-agent pipeline."""
+    _launch_video_pipeline(mode="multi")
+
+
+def start_single_claude_pipeline() -> None:
+    """Launch the single-Claude pipeline (all instructions + docs to one account)."""
+    _launch_video_pipeline(mode="single")
 
 
 # --------------------------------------------------------------------------- #
@@ -1609,30 +1634,46 @@ def render_home() -> None:
         st.markdown(
             '<div style="margin-bottom: 0.75rem; font-size: 0.95rem; '
             'color: var(--text-secondary);">'
-            '<strong>🎬 Auto-Dub Pipeline</strong> — 9-step semi-automated video '
+            '<strong>🎬 Auto-Dub Pipeline</strong> — semi-automated video '
             "translation & dubbing pipeline (Claude + Manual uploads)."
             "</div>",
             unsafe_allow_html=True,
         )
-        col_preset, col_info = st.columns([1.2, 3])
+        col_preset, col_preset2, col_info = st.columns([1.2, 1.2, 3])
         with col_preset:
             pipeline_btn = st.button(
-                "🚀 Start Video Dubbing Pipeline",
+                "🚀 9-Step Pipeline",
                 type="primary",
                 key="video_pipeline_preset",
                 width="stretch",
                 help=(
                     "Launches the 9-step pipeline: video upload, SRT upload, "
                     "Claude dialogue translation, OmniVoice audio upload, "
-                    "Claude sync, Hindi subtitles, QA, and fix."
+                    "Claude sync, Hindi subtitles, QA, and fix — 5 separate "
+                    "Claude agents (one per agentic step)."
                 ),
             )
             if pipeline_btn:
                 start_video_pipeline()
+        with col_preset2:
+            single_btn = st.button(
+                "🧠 Single-Claude Mode",
+                key="video_pipeline_single",
+                width="stretch",
+                help=(
+                    "Launches the single-Claude pipeline: ONE Claude account "
+                    "receives ALL instruction files (fetched together from "
+                    "GitHub) plus ALL documents (video, SRT, audio) at once, "
+                    "and does the complete workflow in one conversation."
+                ),
+            )
+            if single_btn:
+                start_single_claude_pipeline()
         with col_info:
             st.caption(
-                "Requires: 1+ Claude profile(s) connected, GitHub instruction "
-                "URLs configured in ⚙️ Settings → Preferences."
+                "**9-Step:** 5 agents (translation → sync → subtitles → QA → fix). "
+                "**Single-Claude:** 1 agent does everything with all instructions "
+                "combined. Requires: 1+ Claude profile(s), GitHub URLs in ⚙️ Settings → Preferences."
             )
     render_composer()
 
